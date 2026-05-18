@@ -2,6 +2,7 @@ package com.airguard.server.controller;
 
 import com.airguard.server.model.PlaneData;
 import com.airguard.server.service.AirSpaceService;
+import com.airguard.server.service.TrafficGeneratorService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,6 +19,9 @@ public class AirGuardController {
 
     @Autowired
     private AirSpaceService airSpaceService; // חיבור ל"מוח" ששומר את המטוסים
+
+    @Autowired
+    private TrafficGeneratorService trafficGeneratorService;
 
     // הכתובת תהיה: http://localhost:8080/api/planes
     @GetMapping("/planes")
@@ -38,5 +42,15 @@ public class AirGuardController {
     public void deletePlane(@PathVariable String id) {
         airSpaceService.removePlane(id);
         System.out.println("🗑️ Manual plane deleted: " + id);
+    }
+
+    @PostMapping("/toggle-spawn") // או שתוסיף /api/ לפני אם ככה עשית בשאר הפונקציות
+    public boolean toggleAutoSpawn() {
+        // בודק מה המצב הנוכחי, והופך אותו (אם דלוק מכבה, אם מכובה מדליק)
+        boolean currentState = trafficGeneratorService.isAutoSpawnEnabled();
+        trafficGeneratorService.setAutoSpawnEnabled(!currentState);
+
+        // מחזיר ל-React את המצב החדש כדי שיוכל לעדכן את הצבע של הכפתור
+        return !currentState;
     }
 }
