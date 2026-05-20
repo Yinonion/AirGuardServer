@@ -46,8 +46,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/login").permitAll()
 
                         // 2. 🌟 הגדרת הרשאות חכמות לפי הבקשה שלך 🌟
-                        // רק ADMIN יכול לעצור/לחדש יצירת מטוסים:
-                        .requestMatchers("/api/toggle-spawn").hasRole("ADMIN")
+
+                        // רק ADMIN יכול לרשום controllers חדשים:
+                        .requestMatchers("/api/users/register").hasRole("ADMIN")
 
                         // רק ADMIN יכול לגשת לנתיבי ניהול משתמשים (נוסיף את הנתיב הזה בהמשך בשביל הוספת בקרים):
                         .requestMatchers("/api/users/**").hasRole("ADMIN")

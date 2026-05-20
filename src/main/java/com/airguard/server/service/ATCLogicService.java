@@ -21,7 +21,11 @@ public class ATCLogicService {
     private FlightQueue mediumPlanesQueue = new FlightQueue();
     private FlightQueue largePlanesQueue = new FlightQueue();
 
-    private final double SHORT_FINAL_DEGREES = 0.08;
+    private final double FAF = 0.08; // Final Approach Fix | 0.08 degrees is about 8.5 Km
+
+    // *** קבוע מרוכז למרחק נקודת ה-IF (יעד ניווט כשהמטוס עדיין לא מיושר) מסף המסלול ***
+    // שימוש גם בשידוך מסלולים וגם בניווט
+    private final double IF_DISTANCE = 0.15;
 
     @Autowired
     public ATCLogicService(AirSpaceService airSpaceService) {
@@ -38,6 +42,27 @@ public class ATCLogicService {
         return Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2));
     }
 
+    // *** מחשב את נקודת ה-IF (Initial Fix) עבור קצה מסלול נתון ***
+    // ה-IF נמצא במרחק IF_DISTANCE (0.15 מעלות שזה 16.5 ק"מ) מהקצה, בכיוון הנגדי לכיוון המסלול
+    private double[] calculateIF(double[] threshold, double[] otherEdge) {
+        double runwayHeading = calculateHeadingToTarget(threshold[0], threshold[1], otherEdge[0], otherEdge[1]);
+        double backHeading = (runwayHeading + 180) % 360;
+        double ifX = threshold[0] + Math.cos(Math.toRadians(backHeading)) * IF_DISTANCE;
+        double ifY = threshold[1] + Math.sin(Math.toRadians(backHeading)) * IF_DISTANCE;
+        return new double[]{ifX, ifY};
+    }
+
+    // *** בוחר את קצה המסלול הנכון לנחיתה לפי קרבה ל-IF (לא לקצה עצמו!) ***
+    // כך המטוס תמיד מגיע מהכיוון הנכון של ציר הגישה
+    private double[] selectCorrectThreshold(Plane plane, Runway rwy) {
+        double[] if1 = calculateIF(rwy.getEdge1(), rwy.getEdge2());
+        double[] if2 = calculateIF(rwy.getEdge2(), rwy.getEdge1());
+        double distToIF1 = calculateDistance(plane.getX(), plane.getY(), if1[0], if1[1]);
+        double distToIF2 = calculateDistance(plane.getX(), plane.getY(), if2[0], if2[1]);
+        // בוחרים את הקצה שה-IF שלו קרוב יותר למטוס
+        return (distToIF1 < distToIF2) ? rwy.getEdge1() : rwy.getEdge2();
+    }
+
     // אלגוריתם שידוך מסלולים עם מנגנון גניבה חכם לפי מרחק
     private double[] assignRunway(Plane plane) {
         List<Runway> runways = airSpaceService.getRunways();
@@ -50,13 +75,16 @@ public class ATCLogicService {
         // שלב 1: חיפוש מסלול פנוי לחלוטין
         for (Runway rwy : runways) {
             if (rwy.getAllowedSizes().contains(plane.getSize()) && !rwy.isOccupied()) {
-                double dist1 = calculateDistance(plane.getX(), plane.getY(), rwy.getEdge1()[0], rwy.getEdge1()[1]);
-                double dist2 = calculateDistance(plane.getX(), plane.getY(), rwy.getEdge2()[0], rwy.getEdge2()[1]);
-                double currentShortest = Math.min(dist1, dist2);
-                if (currentShortest < shortestDistance) {
-                    shortestDistance = currentShortest;
+                // *** בחירת קצה לפי קרבה ל-IF, לא לקצה עצמו ***
+                double[] candidateThreshold = selectCorrectThreshold(plane, rwy);
+                double[] otherEdge = (candidateThreshold == rwy.getEdge1()) ? rwy.getEdge2() : rwy.getEdge1();
+                double[] candidateIF = calculateIF(candidateThreshold, otherEdge);
+                double distToIF = calculateDistance(plane.getX(), plane.getY(), candidateIF[0], candidateIF[1]);
+
+                if (distToIF < shortestDistance) {
+                    shortestDistance = distToIF;
                     bestRunway = rwy;
-                    targetEdge = (dist1 < dist2) ? rwy.getEdge1() : rwy.getEdge2();
+                    targetEdge = candidateThreshold;
                 }
             }
         }
@@ -77,9 +105,8 @@ public class ATCLogicService {
                             occupyingPlane.setAssignedRunway(null); // מוחקים לו את השיוך
 
                             bestRunway = rwy;
-                            double dist1 = calculateDistance(plane.getX(), plane.getY(), rwy.getEdge1()[0], rwy.getEdge1()[1]);
-                            double dist2 = calculateDistance(plane.getX(), plane.getY(), rwy.getEdge2()[0], rwy.getEdge2()[1]);
-                            targetEdge = (dist1 < dist2) ? rwy.getEdge1() : rwy.getEdge2();
+                            // *** גם כאן בחירת קצה לפי IF ***
+                            targetEdge = selectCorrectThreshold(plane, rwy);
                             break;
                         }
                     }
@@ -208,7 +235,7 @@ public class ATCLogicService {
                     double targetHeading = calculateHeadingToTarget(plane.getX(), plane.getY(), 32.01, 34.88);
                     plane.setTargetHeading(targetHeading);
                 }
-                else if (plane.getState().equals("APPROACH")) {
+                else if (plane.getState().equals("APPROACH") || plane.getState().equals("FINAL_APPROACH")) {
                     Runway myRwy = null;
                     for (Runway rwy : runways) {
                         if (plane.getId().equals(rwy.getCurrentlyAssignedPlaneId())) {
@@ -220,7 +247,7 @@ public class ATCLogicService {
                         // מנגנון הבראה עצמית: כופה ומסנכרן את שדה המסלול בכל שנייה מחדש!
                         plane.setAssignedRunway(myRwy.getId());
 
-                        // תיקון ה-Typo שהיה כאן (myRwy במקום mymyRwy)
+                        // תיקון ה-Typo שהיה כאן (myRwy במקום myRwy)
                         double dist1 = calculateDistance(plane.getX(), plane.getY(), myRwy.getEdge1()[0], myRwy.getEdge1()[1]);
                         double dist2 = calculateDistance(plane.getX(), plane.getY(), myRwy.getEdge2()[0], myRwy.getEdge2()[1]);
                         double[] targetEdge = (dist1 < dist2) ? myRwy.getEdge1() : myRwy.getEdge2();
@@ -233,8 +260,8 @@ public class ATCLogicService {
 
                         double fafX = targetEdge[0] + Math.cos(Math.toRadians(backHeading)) * 0.08;
                         double fafY = targetEdge[1] + Math.sin(Math.toRadians(backHeading)) * 0.08;
-                        double ifX = targetEdge[0] + Math.cos(Math.toRadians(backHeading)) * 0.15;
-                        double ifY = targetEdge[1] + Math.sin(Math.toRadians(backHeading)) * 0.15;
+                        double ifX = targetEdge[0] + Math.cos(Math.toRadians(backHeading)) * IF_DISTANCE;
+                        double ifY = targetEdge[1] + Math.sin(Math.toRadians(backHeading)) * IF_DISTANCE;
 
                         double currentAngleToRunway = calculateHeadingToTarget(plane.getX(), plane.getY(), targetEdge[0], targetEdge[1]);
                         double diffAngle = Math.abs((currentAngleToRunway - runwayHeading + 540) % 360 - 180);
@@ -247,6 +274,9 @@ public class ATCLogicService {
                             if (plane.getSpeed() > 250) plane.setSpeed(Math.max(250, plane.getSpeed() - 8));
                             if (plane.getAltitude() > 3000) plane.setAltitude(Math.max(3000, plane.getAltitude() - 300));
                         } else {
+                            // המטוס נכנס לקו המקווקו! משנים לו סטטוס כדי שיקבל חסינות TCAS
+                            plane.setState("FINAL_APPROACH");
+
                             if (plane.getSpeed() > 250) plane.setSpeed(Math.max(250, plane.getSpeed() - 10));
                             double desiredAltitude = (distanceToThreshold / 0.08) * 3000;
                             if (plane.getAltitude() > desiredAltitude) plane.setAltitude(Math.max(0, plane.getAltitude() - 200));
@@ -324,24 +354,60 @@ public class ATCLogicService {
 
                     // הגדרת רדיוס סכנה: פחות מ-0.05 מרחק אופקי ופחות מ-1000 רגל הפרש גבהים
                     if (horizontalDist < 0.05 && verticalDist < 1000) {
-                        System.out.println("⚠️ TCAS WARNING: Conflict detected between " + p1.getId() + " and " + p2.getId());
 
-                        // מנגנון הפרדה אנכית אוטומטית (Resolution Advisory)
-                        if (p1.getAltitude() >= p2.getAltitude()) {
-                            // p1 גבוה יותר או שווה - מורים לו לטפס, ול-p2 לרדת
-                            p1.setAltitude(p1.getAltitude() + 400);
-                            p2.setAltitude(Math.max(1000, p2.getAltitude() - 400));
+                        boolean p1Emerg = p1.isEmergency();
+                        boolean p2Emerg = p2.isEmergency();
+                        boolean p1Final = p1.getState().equals("FINAL_APPROACH");
+                        boolean p2Final = p2.getState().equals("FINAL_APPROACH");
 
-                            // שינוי כיוון קל הצידה כדי להגדיל טווח אופקי
-                            p1.setTargetHeading((p1.getTargetHeading() + 20) % 360);
-                            p2.setTargetHeading((p2.getTargetHeading() - 20 + 360) % 360);
-                        } else {
-                            // p2 גבוה יותר - מורים לו לטפס, ול-p1 לרדת
-                            p2.setAltitude(p2.getAltitude() + 400);
-                            p1.setAltitude(Math.max(1000, p1.getAltitude() - 400));
+                        // 1. שני המטוסים בפיינל מקביל, או אחד בפיינל ואחד בחירום - מתעלמים לחלוטין!
+                        if ((p1Final && p2Final) || (p1Emerg && p2Final) || (p2Emerg && p1Final)) {
+                            System.out.println("✈️ TCAS Muted: " + p1.getId() + " and " + p2.getId() + " are established on safe parallel finals.");
+                            continue; // מדלגים על פקודת ההתחמקות
+                        }
 
-                            p2.setTargetHeading((p2.getTargetHeading() + 20) % 360);
-                            p1.setTargetHeading((p1.getTargetHeading() - 20 + 360) % 360);
+                        // 2. שניהם בחירום! הקרוב נוחת, הרחוק מטפס מעט וחוזר לנחיתה
+                        else if (p1Emerg && p2Emerg) {
+                            Plane aborting = (p1.getDistanceToAirport() > p2.getDistanceToAirport()) ? p1 : p2;
+                            aborting.setAltitude(aborting.getAltitude() + 400); // עולה קצת לתת ספייס
+                            // אנחנו לא משנים לו כיוון, שיישאר על הציר ופשוט יעכב את הירידה שלו
+                        }
+
+                        // 3. אחד בחירום, השני במצב רגיל/Approach (הרגיל בורח)
+                        else if (p1Emerg && !p2Emerg) {
+                            p2.setAltitude(p2.getAltitude() + 600);
+                            p2.setTargetHeading((p2.getTargetHeading() + 45) % 360);
+                        }
+
+                        else if (p2Emerg && !p1Emerg) {
+                            p1.setAltitude(p1.getAltitude() + 600);
+                            p1.setTargetHeading((p1.getTargetHeading() + 45) % 360);
+                        }
+
+                        // 4. אחד בפיינל, השני במצב רגיל/Approach/Holding (הרגיל בורח)
+                        else if (p1Final && !p2Final) {
+                            p2.setAltitude(p2.getAltitude() + 600);
+                            p2.setTargetHeading((p2.getTargetHeading() + 45) % 360);
+                        }
+
+                        else if (p2Final && !p1Final) {
+                            p1.setAltitude(p1.getAltitude() + 600);
+                            p1.setTargetHeading((p1.getTargetHeading() + 45) % 360);
+                        }
+
+                        // 5. TCAS סטנדרטי למטוסים רגילים (אף אחד לא בפיינל ולא בחירום)
+                        else {
+                            if (p1.getAltitude() >= p2.getAltitude()) {
+                                p1.setAltitude(p1.getAltitude() + 400);
+                                p2.setAltitude(Math.max(1000, p2.getAltitude() - 400));
+                                p1.setTargetHeading((p1.getTargetHeading() + 20) % 360);
+                                p2.setTargetHeading((p2.getTargetHeading() - 20 + 360) % 360);
+                            } else {
+                                p2.setAltitude(p2.getAltitude() + 400);
+                                p1.setAltitude(Math.max(1000, p1.getAltitude() - 400));
+                                p2.setTargetHeading((p2.getTargetHeading() + 20) % 360);
+                                p1.setTargetHeading((p1.getTargetHeading() - 20 + 360) % 360);
+                            }
                         }
                     }
                 }
