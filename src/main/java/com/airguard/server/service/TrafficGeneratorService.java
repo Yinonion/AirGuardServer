@@ -1,6 +1,6 @@
 package com.airguard.server.service;
 
-import com.airguard.server.model.PlaneData;
+import com.airguard.server.entity.Plane;
 import org.springframework.stereotype.Service;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,14 +23,14 @@ public class TrafficGeneratorService {
     @Scheduled(fixedRate = 15000)
     public void spawnRandomTraffic() {
         if (isAutoSpawnEnabled && airSpaceService.getAutoPlanesCount() < 5) {
-            PlaneData newPlane = createRandomPlane();
+            Plane newPlane = createRandomPlane();
             airSpaceService.addPlane(newPlane); // מעביר למחסן הראשי
         }
     }
 
     // הפונקציה שאחראית רק על הגרלת הנתונים
-    private PlaneData createRandomPlane() {
-        PlaneData plane = new PlaneData();
+    private Plane createRandomPlane() {
+        Plane plane = new Plane();
         String[] airlines = {"ELAL", "ARKIA", "ISRAIR", "LUFTHANSA", "WIZZ", "RYANAIR", "UNITED"};
 
         // בתוך הפונקציה createRandomPlane:

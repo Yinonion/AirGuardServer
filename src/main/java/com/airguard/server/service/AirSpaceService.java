@@ -1,99 +1,134 @@
 package com.airguard.server.service;
 
-import com.airguard.server.model.PlaneData;
 import com.airguard.server.model.Runway;
-import org.springframework.stereotype.Service;
+import com.airguard.server.entity.Plane;
+import com.airguard.server.entity.FlightLog;
+import com.airguard.server.entity.Airline;
+import com.airguard.server.repository.PlaneRepository;
+import com.airguard.server.repository.AirlineRepository;
+import com.airguard.server.repository.FlightLogRepository;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.Arrays;
+import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import jakarta.annotation.PostConstruct;
 
-@Service // אומר ל-Spring: "זה מנהל שירות, שמור עליו"
+import java.time.LocalDateTime;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+
+@Service
 public class AirSpaceService {
 
-    // הזיכרון החי: מפתח = מזהה מטוס, ערך = נתוני המטוס
-    private final ConcurrentHashMap<String, PlaneData> activePlanes = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Plane> activePlanes = new ConcurrentHashMap<>();
+    private final List<Runway> runways = new ArrayList<>();
 
-    // רשימת המסלולים בשדה
-    private List<Runway> runways = new ArrayList<>();
+    // הזרקת כלי העבודה של בסיס הנתונים
+    @Autowired private PlaneRepository planeRepository;
+    @Autowired private AirlineRepository airlineRepository;
+    @Autowired private FlightLogRepository flightLogRepository;
 
-    // אתחול המסלולים ברגע שהשרת עולה
     @PostConstruct
     public void initRunways() {
         runways.clear();
-
-        // מסלול צפוני - קטן
-        runways.add(new Runway("RWY-1", Arrays.asList("Small"),
-                new double[]{32.05, 34.83}, new double[]{32.05, 34.93}));
-
-        // מסלול אמצע-צפון - משולב
-        runways.add(new Runway("RWY-2", Arrays.asList("Small", "Medium"),
-                new double[]{32.03, 34.83}, new double[]{32.03, 34.93}));
-
-        // מסלול אמצע-דרום - משולב
-        runways.add(new Runway("RWY-3", Arrays.asList("Medium", "Large"),
-                new double[]{31.99, 34.83}, new double[]{31.99, 34.93}));
-
-        // מסלול דרומי - ענק
-        runways.add(new Runway("RWY-4", Arrays.asList("Large"),
-                new double[]{31.97, 34.83}, new double[]{31.97, 34.93}));
+        runways.add(new Runway("RWY-1", Arrays.asList("Small"), new double[]{32.05, 34.83}, new double[]{32.05, 34.93}));
+        runways.add(new Runway("RWY-2", Arrays.asList("Small", "Medium"), new double[]{32.03, 34.83}, new double[]{32.03, 34.93}));
+        runways.add(new Runway("RWY-3", Arrays.asList("Medium", "Large"), new double[]{31.99, 34.83}, new double[]{31.99, 34.93}));
+        runways.add(new Runway("RWY-4", Arrays.asList("Large"), new double[]{31.97, 34.83}, new double[]{31.97, 34.93}));
     }
 
-    // פונקציית הטריגונומטריה: מחשבת את הזווית המדויקת מהמטוס אל קצה המסלול (נשארת כי addPlane משתמשת בה)
     private double calculateHeadingToTarget(double fromX, double fromY, double toX, double toY) {
-        // מתמטיקה קלאסית: Y חלקי X
         double angleDeg = Math.toDegrees(Math.atan2(toY - fromY, toX - fromX));
-        if (angleDeg < 0) {
-            angleDeg += 360;
-        }
+        if (angleDeg < 0) angleDeg += 360;
         return angleDeg;
     }
 
-    //  עדכון מטוס (נקרא ע"י ה-Socket)
-    public void updatePlane(PlaneData data) {
-        activePlanes.put(data.id, data);
+    public void updatePlane(Plane data) {
+        activePlanes.put(data.getId(), data);
     }
 
-    //  שליפת כל המטוסים (ייקרא ע"י האתר והשירותים האחרים)
-    public Collection<PlaneData> getAllPlanes() {
+    public Collection<Plane> getAllPlanes() {
         return activePlanes.values();
     }
 
-    //  הוספת מטוס חדש לרשימה (עבור המטוסים הידניים מהאתר)
-    public void addPlane(PlaneData plane) {
-        // עקיפה: מחשבים זווית ישירות לנתב"ג ודורסים את מה שהגיע מהאתר
-        double targetToTLV = calculateHeadingToTarget(plane.getX(), plane.getY(), 32.01, 34.88);
-        plane.setTargetHeading(targetToTLV);
-        // אם המטוס נוצר קרוב (בתוך הרדאר), נגדיר אותו מיד לשיוט שיכנס למערכת
-        plane.setState("CRUISE");
+    // הפונקציה המרכזית: מנהלת את כניסת המטוסים ואת אכיפת הקביעות ב-SQL
+    public void addPlane(Plane incomingPlane) {
+        // 1. חישובים גיאוגרפיים התחלתיים קבועים
+        double targetToTLV = calculateHeadingToTarget(incomingPlane.getX(), incomingPlane.getY(), 32.01, 34.88);
+        incomingPlane.setTargetHeading(targetToTLV);
+        incomingPlane.setState("CRUISE");
 
-        activePlanes.put(plane.getId(), plane);
-        System.out.println("✈️ Plane added manually: " + plane.getId());
+        Plane planeToActivate;
+
+        // 2. בדיקה: האם המטוס קיים כבר בקטלוג הסטטי ב-DB?
+        Optional<Plane> existingPlaneOpt = planeRepository.findById(incomingPlane.getId());
+
+        if (existingPlaneOpt.isPresent()) {
+            // הפיצ'ר שביקשת! המטוס קיים ב-DB. אנחנו לוקחים את הישות המקורית מהמסד
+            planeToActivate = existingPlaneOpt.get();
+
+            // מעתיקים אליה אך ורק את הנתונים הדינמיים החדשים (מיקום, מהירות, דלק וכו')
+            planeToActivate.setX(incomingPlane.getX());
+            planeToActivate.setY(incomingPlane.getY());
+            planeToActivate.setHeading(incomingPlane.getHeading());
+            planeToActivate.setTargetHeading(incomingPlane.getTargetHeading());
+            planeToActivate.setSpeed((int) incomingPlane.getSpeed());
+            planeToActivate.setAltitude((int) incomingPlane.getAltitude());
+            planeToActivate.setFuel(incomingPlane.getFuel());
+            planeToActivate.setEmergency(incomingPlane.isEmergency());
+            planeToActivate.setState(incomingPlane.getState());
+            planeToActivate.setAutoGenerated(incomingPlane.isAutoGenerated());
+            planeToActivate.setPathHistory(new java.util.ArrayDeque<>()); // מאפסים את השובל הישן
+
+            System.out.println("🔒 [SQL Lock]: Reused permanent attributes for existing plane: " + planeToActivate.getId());
+        } else {
+            // המטוס לא קיים בקטלוג - זהו ביקורו הראשון!
+            planeToActivate = incomingPlane;
+
+            // שידוך אוטומטי לחברת התעופה לפי קידומת השם (למשל "ELAL" מתוך "ELAL-550")
+            String airlinePrefix = incomingPlane.getId().split("-")[0];
+            airlineRepository.findAll().stream()
+                    .filter(a -> a.getName().equalsIgnoreCase(airlinePrefix) ||
+                            (airlinePrefix.equalsIgnoreCase("ELAL") && a.getName().equals("El Al")))
+                    .findFirst()
+                    .ifPresent(planeToActivate::setAirline);
+
+            // שמירה קבועה שלו בקטלוג ה-SQL לתמיד
+            planeRepository.save(planeToActivate);
+            System.out.println("💾 [SQL Save]: Registered new plane to catalog: " + planeToActivate.getId());
+        }
+
+        // 3. תיעוד האירוע: פתיחת שורה חדשה בטבלת היסטוריית הטיסות (FlightLog)
+        FlightLog log = new FlightLog();
+        log.setPlane(planeToActivate);
+        log.setEntryTime(LocalDateTime.now());
+        log.setStatus(planeToActivate.isEmergency() ? "Emergency" : "En Route");
+        flightLogRepository.save(log);
+
+        // 4. הזרקה לזיכרון החי (RAM) כדי שיוצג ברדאר של ה-React
+        activePlanes.put(planeToActivate.getId(), planeToActivate);
     }
 
-    // מחזירה כמה מטוסים אוטומטיים יש כרגע במערכת
+    // עדכון מנגנון המחיקה: סגירת הלוג ב-SQL בעת נחיתה/מחיקה
+    public void removePlane(String id) {
+        Plane plane = activePlanes.remove(id);
+        if (plane != null) {
+            // מחפשים את הלוג הפתוח של הטיסה הזו ומעדכנים את זמן הנחיתה והסטטוס הסופי
+            flightLogRepository.findFirstByPlaneAndExitTimeIsNullOrderByEntryTimeDesc(plane)
+                    .ifPresent(log -> {
+                        log.setExitTime(LocalDateTime.now());
+                        log.setStatus(plane.getState().equals("LANDED") ? "Landed" : "Removed by Controller");
+                        flightLogRepository.save(log);
+                        System.out.println("📝 [SQL Log]: FlightLog closed for plane " + id);
+                    });
+        }
+    }
+
     public int getAutoPlanesCount() {
         return (int) activePlanes.values().stream()
-                .filter(PlaneData::isAutoGenerated) // סופר רק מטוסים עם התווית הדלוקה
+                .filter(Plane::isAutoGenerated)
                 .count();
     }
 
-    //  מחיקת מטוס (כשהוא נוחת/מתנתק/נמחק ע"י המשתמש)
-    public void removePlane(String id) {
-        activePlanes.remove(id);
-    }
-
-    // מאפשר למגדל הפיקוח לקרוא את מפת המטוסים המלאה (כדי למצוא מטוס ספציפי לפי ID בחירום)
-    public Map<String, PlaneData> getActivePlanesMap() {
-        return activePlanes;
-    }
-
-    // מאפשר למגדל הפיקוח לקרוא את רשימת המסלולים
-    public List<Runway> getRunways() {
-        return runways;
-    }
+    public Map<String, Plane> getActivePlanesMap() { return activePlanes; }
+    public List<Runway> getRunways() { return runways; }
 }

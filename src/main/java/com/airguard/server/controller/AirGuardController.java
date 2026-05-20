@@ -1,8 +1,8 @@
 package com.airguard.server.controller;
 
-import com.airguard.server.model.PlaneData;
 import com.airguard.server.service.AirSpaceService;
 import com.airguard.server.service.TrafficGeneratorService;
+import com.airguard.server.entity.Plane;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -25,13 +25,13 @@ public class AirGuardController {
 
     // הכתובת תהיה: http://localhost:8080/api/planes
     @GetMapping("/planes")
-    public Collection<PlaneData> getPlanes() {
+    public Collection<Plane> getPlanes() {
         return airSpaceService.getAllPlanes();
     }
 
     // 1. הוספת מטוס ידנית (מהאתר)
     @PostMapping("/planes")
-    public PlaneData addPlane(@RequestBody PlaneData plane) {
+    public Plane addPlane(@RequestBody Plane plane) {
         airSpaceService.addPlane(plane);
         System.out.println("➕ Manual plane added: " + plane.getId());
         return plane;

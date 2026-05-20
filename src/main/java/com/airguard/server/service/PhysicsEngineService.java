@@ -1,6 +1,6 @@
 package com.airguard.server.service; // ודא שזה תואם לשם החבילה שלך
 
-import com.airguard.server.model.PlaneData;
+import com.airguard.server.entity.Plane;
 import org.springframework.stereotype.Service;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,9 +19,9 @@ public class PhysicsEngineService {
 
     @Scheduled(fixedRate = 1000)
     public void applyPhysicsToAllPlanes() {
-        Collection<PlaneData> activePlanes = airSpaceService.getAllPlanes();
+        Collection<Plane> activePlanes = airSpaceService.getAllPlanes();
 
-        for (PlaneData plane : activePlanes) {
+        for (Plane plane : activePlanes) {
 
             // מזיזים את המטוס רק אם יש לו דלק, ורק אם הוא באמת טס (מהירות גדולה מ-0)
             if (plane.getFuel() > 0 && plane.getSpeed() > 0) {

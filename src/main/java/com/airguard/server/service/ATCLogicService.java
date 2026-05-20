@@ -1,12 +1,13 @@
 package com.airguard.server.service;
 
 import com.airguard.server.model.FlightQueue;
-import com.airguard.server.model.PlaneData;
 import com.airguard.server.model.Runway;
+import com.airguard.server.entity.Plane;
 import org.springframework.stereotype.Service;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -38,9 +39,9 @@ public class ATCLogicService {
     }
 
     // אלגוריתם שידוך מסלולים עם מנגנון גניבה חכם לפי מרחק
-    private double[] assignRunway(PlaneData plane) {
+    private double[] assignRunway(Plane plane) {
         List<Runway> runways = airSpaceService.getRunways();
-        Map<String, PlaneData> activePlanes = airSpaceService.getActivePlanesMap();
+        Map<String, Plane> activePlanes = airSpaceService.getActivePlanesMap();
 
         Runway bestRunway = null;
         double[] targetEdge = null;
@@ -64,13 +65,13 @@ public class ATCLogicService {
         if (bestRunway == null) {
             for (Runway rwy : runways) {
                 if (rwy.getAllowedSizes().contains(plane.getSize()) && rwy.isOccupied()) {
-                    PlaneData occupyingPlane = activePlanes.get(rwy.getCurrentlyAssignedPlaneId());
+                    Plane occupyingPlane = activePlanes.get(rwy.getCurrentlyAssignedPlaneId());
                     if (occupyingPlane != null && occupyingPlane.getState().equals("APPROACH")) {
                         double occupyingDist = occupyingPlane.getDistanceToAirport();
                         double myDist = plane.getDistanceToAirport();
 
-                        // התיקון: אם אני קרוב יותר מהמטוס השני אפילו בקצת (0.05), והוא עדיין רחוק מספיק (0.15) - אני לוקח!
-                        if (occupyingDist - myDist > 0.05 && occupyingDist > 0.15) {
+                        // התיקון: אם אני קרוב יותר מהמטוס השני ביחסית הרבה (0.15), והוא עדיין רחוק מספיק (0.35) - אני לוקח!
+                        if (occupyingDist - myDist > 0.15 && occupyingDist > 0.35) {
                             System.out.println("🔄 ATC Optimization: " + plane.getId() + " stole runway from " + occupyingPlane.getId());
                             occupyingPlane.setState("EN_ROUTE");
                             occupyingPlane.setAssignedRunway(null); // מוחקים לו את השיוך
@@ -98,17 +99,18 @@ public class ATCLogicService {
         if (plane.isEmergency()) {
             for (Runway rwy : runways) {
                 if (rwy.getAllowedSizes().contains(plane.getSize()) && rwy.isOccupied()) {
-                    PlaneData occupyingPlane = activePlanes.get(rwy.getCurrentlyAssignedPlaneId());
+                    Plane occupyingPlane = activePlanes.get(rwy.getCurrentlyAssignedPlaneId());
                     if (occupyingPlane != null && occupyingPlane.getState().equals("APPROACH")) {
                         double distToAirport = occupyingPlane.getDistanceToAirport();
-                        // תיקון: מטוס בחירום לא יפקיע מסלול ממטוס שכבר נמצא בפיינל הסופי (קרוב מ-0.15)
-                        if (distToAirport > 0.15) {
+                        // תיקון: מטוס בחירום לא יפקיע מסלול ממטוס שכבר נמצא בפיינל הסופי (קרוב מ-0.07)
+                        if (distToAirport > 0.07) {
                             System.out.println("🚨 ATC EMERGENCY PREEMPTION! " + plane.getId() + " is taking over runway from " + occupyingPlane.getId() + " 🚨");
                             occupyingPlane.setState("EN_ROUTE"); // המפונה ממשיך לטוס רגיל
+                            occupyingPlane.setAssignedRunway(null); // מוחקים למטוס המפונה את השיוך למסלול ב-Java
                             double dist1 = calculateDistance(plane.getX(), plane.getY(), rwy.getEdge1()[0], rwy.getEdge1()[1]);
                             double dist2 = calculateDistance(plane.getX(), plane.getY(), rwy.getEdge2()[0], rwy.getEdge2()[1]);
                             targetEdge = (dist1 < dist2) ? rwy.getEdge1() : rwy.getEdge2();
-                            rwy.setCurrentlyAssignedPlaneId(plane.getId());
+                            rwy.setCurrentlyAssignedPlaneId(plane.getId()); // מוודאים שגם למטוס החירום מעודכן שם המסלול
                             plane.setState("APPROACH");
                             return targetEdge;
                         }
@@ -122,12 +124,12 @@ public class ATCLogicService {
     @Scheduled(fixedRate = 1000)
     public void runATCEngine() {
         List<Runway> runways = airSpaceService.getRunways();
-        Map<String, PlaneData> activePlanes = airSpaceService.getActivePlanesMap();
+        Map<String, Plane> activePlanes = airSpaceService.getActivePlanesMap();
 
         // 1. ניקוי מסלולים ואיפוס שיוכים למטוסים שנחתו
         for (Runway rwy : runways) {
             if (rwy.isOccupied()) {
-                PlaneData p = activePlanes.get(rwy.getCurrentlyAssignedPlaneId());
+                Plane p = activePlanes.get(rwy.getCurrentlyAssignedPlaneId());
                 if (p == null || p.getState().equals("LANDED")) {
                     rwy.setOccupied(false);
                     rwy.setCurrentlyAssignedPlaneId(null);
@@ -135,6 +137,9 @@ public class ATCLogicService {
                 }
             }
         }
+
+        // הפעלת סורק מניעת ההתנגשויות בכל שנייה
+        checkAndResolveCollisions(activePlanes);
 
         // 2. איפוס תורים
         smallPlanesQueue = new FlightQueue();
@@ -144,7 +149,7 @@ public class ATCLogicService {
         double ATC_RADAR_RANGE = 1.5;
 
         // 3. איסוף מטוסים וניהול מצבי טיסה (EN_ROUTE -> HOLDING)
-        for (PlaneData plane : activePlanes.values()) {
+        for (Plane plane : activePlanes.values()) {
             if (plane.getAltitude() > 0 && plane.getDistanceToAirport() <= ATC_RADAR_RANGE) {
 
                 if (plane.getState().equals("CRUISE")) {
@@ -156,8 +161,11 @@ public class ATCLogicService {
                     plane.setEmergency(true);
                 }
 
-                if (plane.getState().equals("EN_ROUTE") && plane.getDistanceToAirport() <= 0.15) {
-                    plane.setState("HOLDING");
+                if (plane.getState().equals("EN_ROUTE") && plane.getDistanceToAirport() <= 0.2) {
+                    // התיקון: רק אם זה לא מטוס בחירום, תכניס אותו להמתנה באוויר
+                    if (!plane.isEmergency()) {
+                        plane.setState("HOLDING");
+                    }
                 }
 
                 if (plane.getState().equals("HOLDING") || plane.getState().equals("EN_ROUTE")) {
@@ -169,21 +177,21 @@ public class ATCLogicService {
         }
 
         // 4. שידוך מסלולים למטוסים הממתינים
-        PlaneData topSmall = smallPlanesQueue.pollHighestPriority();
+        Plane topSmall = smallPlanesQueue.pollHighestPriority();
         if (topSmall != null) assignRunway(topSmall);
-        PlaneData topMedium = mediumPlanesQueue.pollHighestPriority();
+        Plane topMedium = mediumPlanesQueue.pollHighestPriority();
         if (topMedium != null) assignRunway(topMedium);
-        PlaneData topLarge = largePlanesQueue.pollHighestPriority();
+        Plane topLarge = largePlanesQueue.pollHighestPriority();
         if (topLarge != null) assignRunway(topLarge);
 
         // ניהול גבהים במגדל ההמתנה האנכי
-        List<PlaneData> holdingPlanes = activePlanes.values().stream()
+        List<Plane> holdingPlanes = activePlanes.values().stream()
                 .filter(p -> p.getState().equals("HOLDING"))
                 .sorted((p1, p2) -> p1.getId().compareTo(p2.getId()))
                 .collect(Collectors.toList());
 
         for (int i = 0; i < holdingPlanes.size(); i++) {
-            PlaneData p = holdingPlanes.get(i);
+            Plane p = holdingPlanes.get(i);
             double targetHoldingAltitude = 7000.0 + (i * 1000.0);
             if (p.getAltitude() < targetHoldingAltitude) {
                 p.setAltitude(Math.min(targetHoldingAltitude, p.getAltitude() + 300));
@@ -193,7 +201,7 @@ public class ATCLogicService {
         }
 
         // 5. ניווט והכוונה בזמן אמת
-        for (PlaneData plane : activePlanes.values()) {
+        for (Plane plane : activePlanes.values()) {
             if (plane.getDistanceToAirport() <= ATC_RADAR_RANGE) {
 
                 if (plane.getState().equals("EN_ROUTE")) {
@@ -290,6 +298,52 @@ public class ATCLogicService {
                         targetX = northLat; targetY = westLon;
                     }
                     plane.setTargetHeading(calculateHeadingToTarget(pX, pY, targetX, targetY));
+                }
+            }
+        }
+    }
+
+    // אלגוריתם TCAS - סריקה ומניעת התנגשויות בזמן אמת
+    private void checkAndResolveCollisions(Map<String, Plane> activePlanes) {
+        List<Plane> planesList = new ArrayList<>(activePlanes.values());
+
+        // לולאה כפולה להשוואה בין כל זוג מטוסים במרחב
+        for (int i = 0; i < planesList.size(); i++) {
+            for (int j = i + 1; j < planesList.size(); j++) {
+                Plane p1 = planesList.get(i);
+                Plane p2 = planesList.get(j);
+
+                // בודקים רק מטוסים שנמצאים באוויר (גובה מעל 0)
+                if (p1.getAltitude() > 0 && p2.getAltitude() > 0) {
+
+                    // 1. חישוב מרחק אופקי (ק"מ/מעלות)
+                    double horizontalDist = calculateDistance(p1.getX(), p1.getY(), p2.getX(), p2.getY());
+
+                    // 2. חישוב הפרש גבהים אנכי
+                    double verticalDist = Math.abs(p1.getAltitude() - p2.getAltitude());
+
+                    // הגדרת רדיוס סכנה: פחות מ-0.05 מרחק אופקי ופחות מ-1000 רגל הפרש גבהים
+                    if (horizontalDist < 0.05 && verticalDist < 1000) {
+                        System.out.println("⚠️ TCAS WARNING: Conflict detected between " + p1.getId() + " and " + p2.getId());
+
+                        // מנגנון הפרדה אנכית אוטומטית (Resolution Advisory)
+                        if (p1.getAltitude() >= p2.getAltitude()) {
+                            // p1 גבוה יותר או שווה - מורים לו לטפס, ול-p2 לרדת
+                            p1.setAltitude(p1.getAltitude() + 400);
+                            p2.setAltitude(Math.max(1000, p2.getAltitude() - 400));
+
+                            // שינוי כיוון קל הצידה כדי להגדיל טווח אופקי
+                            p1.setTargetHeading((p1.getTargetHeading() + 20) % 360);
+                            p2.setTargetHeading((p2.getTargetHeading() - 20 + 360) % 360);
+                        } else {
+                            // p2 גבוה יותר - מורים לו לטפס, ול-p1 לרדת
+                            p2.setAltitude(p2.getAltitude() + 400);
+                            p1.setAltitude(Math.max(1000, p1.getAltitude() - 400));
+
+                            p2.setTargetHeading((p2.getTargetHeading() + 20) % 360);
+                            p1.setTargetHeading((p1.getTargetHeading() - 20 + 360) % 360);
+                        }
+                    }
                 }
             }
         }

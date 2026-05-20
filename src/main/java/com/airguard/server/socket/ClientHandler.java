@@ -1,7 +1,8 @@
 package com.airguard.server.socket;
 
-import com.airguard.server.model.PlaneData;
 import com.airguard.server.service.AirSpaceService; // <-- ייבוא חדש
+import com.airguard.server.entity.Plane;
+
 import com.google.gson.Gson;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -31,9 +32,9 @@ public class ClientHandler implements Runnable {
 
                 try {
                     // כאן הוא נכשל כרגע, אבל לפחות נראה מה הגיע בשורה למעלה
-                    PlaneData plane = gson.fromJson(jsonMessage, PlaneData.class);
+                    Plane plane = gson.fromJson(jsonMessage, Plane.class);
                     airSpaceService.updatePlane(plane);
-                    System.out.println("✅ Parsed: " + plane.id);
+                    System.out.println("✅ Parsed: " + plane.getId());
                 } catch (Exception e) {
                     System.out.println("❌ Error parsing: " + e.getMessage());
                 }

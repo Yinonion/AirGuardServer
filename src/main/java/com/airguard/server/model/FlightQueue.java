@@ -1,5 +1,6 @@
 package com.airguard.server.model;
 
+import com.airguard.server.entity.Plane;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -7,11 +8,11 @@ public class FlightQueue {
 
     // הגדרת החוליה (Node) ברשימה הדו-כיוונית
     private class Node {
-        PlaneData plane;
+        Plane plane;
         Node next;
         Node prev;
 
-        public Node(PlaneData plane) {
+        public Node(Plane plane) {
             this.plane = plane;
         }
     }
@@ -27,7 +28,7 @@ public class FlightQueue {
     }
 
     // --- אלגוריתם ההכנסה החכמה לפי הדרישה שלך ---
-    public void insert(PlaneData newPlane) {
+    public void insert(Plane newPlane) {
         Node newNode = new Node(newPlane);
         double newScore = newPlane.calculatePriorityScore();
 
@@ -97,9 +98,9 @@ public class FlightQueue {
     }
 
     // --- שליפת המטוס עם העדיפות הכי גבוהה (עבור המגדל שינחית אותו) ---
-    public PlaneData pollHighestPriority() {
+    public Plane pollHighestPriority() {
         if (head == null) return null;
-        PlaneData plane = head.plane;
+        Plane plane = head.plane;
         head = head.next;
         if (head != null) {
             head.prev = null;
@@ -115,8 +116,8 @@ public class FlightQueue {
     }
 
     // פונקציה שממירה את התור לרשימה רגילה (לצורך שליחה ל-React בהמשך אם נרצה להציג את התור במסך)
-    public List<PlaneData> toList() {
-        List<PlaneData> list = new ArrayList<>();
+    public List<Plane> toList() {
+        List<Plane> list = new ArrayList<>();
         Node current = head;
         while (current != null) {
             list.add(current.plane);
