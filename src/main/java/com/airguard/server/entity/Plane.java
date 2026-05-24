@@ -5,6 +5,7 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 
 @Entity
+@com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown = true)
 @Table(name = "Planes")
 public class Plane {
 

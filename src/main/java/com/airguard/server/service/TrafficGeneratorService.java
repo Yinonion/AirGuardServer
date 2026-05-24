@@ -9,7 +9,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 public class TrafficGeneratorService {
 
     private final AirSpaceService airSpaceService;
-    private int autoPlaneCounter = 1;
 
     // הנה ההכנה לכפתור שביקשת! אם זה יהיה false, המערכת תפסיק לייצר מטוסים.
     private boolean isAutoSpawnEnabled = true;
@@ -33,7 +32,6 @@ public class TrafficGeneratorService {
         Plane plane = new Plane();
         String[] airlines = {"ELAL", "ARKIA", "ISRAIR", "LUFTHANSA", "WIZZ", "RYANAIR", "UNITED"};
 
-        // בתוך הפונקציה createRandomPlane:
         String randomAirline = airlines[(int) (Math.random() * airlines.length)];
         int flightNumber = 100 + (int) (Math.random() * 900); // מספר טיסה תלת-ספרתי
         plane.setId(randomAirline + "-" + flightNumber);
@@ -51,9 +49,22 @@ public class TrafficGeneratorService {
         plane.setHeading(Math.random() * 360);
         plane.setTargetHeading((angle + 180) % 360);
 
+        // --- חישוב הגובה המקסימלי (Glide Slope) ביחס למרחק ---
+        // משתמשים ברדיוס כבסיס לחישוב הגובה המקסימלי ההגיוני לאותו מרחק
+        double maxAllowedAltitude = radius * 40000;
+        double minAltitude = 3000; // לא נייצר מטוסים נמוך מ-3000 רגל כדי שיהיה להם זמן גישה
+
+        // מוודאים שהתקרה לא נמוכה מהגובה המינימלי
+        if (maxAllowedAltitude < minAltitude) {
+            maxAllowedAltitude = minAltitude;
+        }
+
+        // הגרלת גובה הגיוני בתוך הטווח המותר
+        double randomAltitude = minAltitude + (Math.random() * (maxAllowedAltitude - minAltitude));
+
         // נתונים אקראיים
         plane.setSpeed(700 + Math.random() * 200);
-        plane.setAltitude(30000 + Math.random() * 10000);
+        plane.setAltitude(randomAltitude); // השורה שתוקנה
         plane.setEmergency(Math.random() < 0.15);
 
         // גודל

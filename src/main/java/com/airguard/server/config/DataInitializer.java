@@ -37,6 +37,26 @@ public class DataInitializer implements CommandLineRunner {
             lufthansa.setCountry("Germany");
             airlineRepository.save(lufthansa);
 
+            Airline israir = new Airline();
+            israir.setName("Israir");
+            israir.setCountry("Israel");
+            airlineRepository.save(israir);
+
+            Airline ryanair  = new Airline();
+            ryanair.setName("Ryanair");
+            ryanair.setCountry("Ireland");
+            airlineRepository.save(ryanair);
+
+            Airline wizz = new Airline();
+            wizz.setName("Wizz Air");
+            wizz.setCountry("Hungary");
+            airlineRepository.save(wizz);
+
+            Airline arkia = new Airline();
+            arkia.setName("Arkia");
+            arkia.setCountry("Israel");
+            airlineRepository.save(arkia);
+
             System.out.println("🌱 [SQL Seed]: Sample airlines inserted successfully!");
         }
     }

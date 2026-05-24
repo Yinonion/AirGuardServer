@@ -274,8 +274,12 @@ public class ATCLogicService {
                             if (plane.getSpeed() > 250) plane.setSpeed(Math.max(250, plane.getSpeed() - 8));
                             if (plane.getAltitude() > 3000) plane.setAltitude(Math.max(3000, plane.getAltitude() - 300));
                         } else {
-                            // המטוס נכנס לקו המקווקו! משנים לו סטטוס כדי שיקבל חסינות TCAS
-                            plane.setState("FINAL_APPROACH");
+                            // מעבר ל-FINAL_APPROACH רק אם המטוס כבר מיושר עם ציר המסלול (diffAngle קטן)
+                            // וגם כבר ירד לגובה סביר (מתחת ל-4000 רגל) — כלומר הוא לא זה עתה יצא מ-HOLDING
+                            // מקבל חסינות מ-TCAS
+                            if (diffAngle <= 15 && plane.getAltitude() < 4000) {
+                                plane.setState("FINAL_APPROACH");
+                            }
 
                             if (plane.getSpeed() > 250) plane.setSpeed(Math.max(250, plane.getSpeed() - 10));
                             double desiredAltitude = (distanceToThreshold / 0.08) * 3000;
