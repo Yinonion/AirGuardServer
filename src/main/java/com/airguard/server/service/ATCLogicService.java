@@ -317,10 +317,10 @@ public class ATCLogicService {
                     double pY = plane.getY();
                     double targetX, targetY;
 
-                    double northLat = 32.08;
-                    double southLat = 31.94;
-                    double eastLon = 35.12;
-                    double westLon = 34.62;
+                    double northLat = 32.06;
+                    double southLat = 31.96;
+                    double eastLon = 35.01;
+                    double westLon = 34.75;
 
                     if (pX >= northLat && pY < eastLon) {
                         targetX = northLat; targetY = eastLon;
