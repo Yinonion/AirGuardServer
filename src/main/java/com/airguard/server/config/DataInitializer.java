@@ -57,7 +57,7 @@ public class DataInitializer implements CommandLineRunner {
             arkia.setCountry("Israel");
             airlineRepository.save(arkia);
 
-            System.out.println("🌱 [SQL Seed]: Sample airlines inserted successfully!");
+            System.out.println("[SQL Seed]: Sample airlines inserted successfully!");
         }
     }
 }

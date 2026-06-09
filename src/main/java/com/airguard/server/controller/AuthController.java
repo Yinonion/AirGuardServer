@@ -41,7 +41,7 @@ public class AuthController {
             admin.setPassword(passwordEncoder.encode("AdminFreddie")); // כאן אנחנו מצפינים את הסיסמה ל-DB!
             admin.setRole("Admin");
             userRepository.save(admin);
-            System.out.println("✅ Default Admin User Created! ID: 329329734 | Password: AdminFreddie");
+            System.out.println("Default Admin User Created! ID: 329329734 | Password: AdminFreddie");
         }
     }
 
@@ -94,7 +94,7 @@ public class AuthController {
         // מוציאים את התפקיד (ADMIN או CONTROLLER)
         String role = userDetails.getAuthorities().iterator().next().getAuthority().replace("ROLE_", "");
 
-        // מייצרים את הטוקן!
+        // מייצרים את הטוקן
         final String jwt = jwtUtil.generateToken(userDetails.getUsername(), role);
 
         // מחזירים ל-React תשובה מושלמת עם הטוקן, התפקיד והשם (כדי לכתוב לו "שלום, פקח X" במסך)

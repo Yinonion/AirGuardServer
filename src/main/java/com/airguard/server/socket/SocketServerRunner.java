@@ -27,11 +27,11 @@ public class SocketServerRunner implements CommandLineRunner {
     private void runServer() {
         try {
             ServerSocket serverSocket = new ServerSocket(PORT);
-            System.out.println("✈️ AirGuard Socket Server is listening on port " + PORT);
+            System.out.println("AirGuard Socket Server is listening on port " + PORT);
 
             while (true) {
                 Socket clientSocket = serverSocket.accept();
-                System.out.println("✈️ New Plane Connected!");
+                System.out.println("New Plane Connected!");
 
                 // עכשיו השורה הזו תעבוד (כי יצרנו את הקובץ!)
                 ClientHandler handler = new ClientHandler(clientSocket, airSpaceService);

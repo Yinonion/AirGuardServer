@@ -10,7 +10,7 @@ import java.net.Socket;
 
 public class ClientHandler implements Runnable {
     private Socket clientSocket;
-    private AirSpaceService airSpaceService; // <-- משתנה חדש לשירות
+    private AirSpaceService airSpaceService; // משתנה חדש לשירות
     private Gson gson = new Gson();
 
     // מעדכנים את הבנאי כדי לקבל את השירות
@@ -26,17 +26,16 @@ public class ClientHandler implements Runnable {
             String jsonMessage;
 
             while ((jsonMessage = in.readLine()) != null) {
-                // --- הוספנו את השורה הזו: ---
-                System.out.println("🔍 RAW RECEIVED: " + jsonMessage);
+                System.out.println("RAW RECEIVED: " + jsonMessage);
                 // ---------------------------
 
                 try {
-                    // כאן הוא נכשל כרגע, אבל לפחות נראה מה הגיע בשורה למעלה
+                    // כאן הוא נכשל כרגע, אבל זה בשביל לראות מה הגיע בשורה למעלה
                     Plane plane = gson.fromJson(jsonMessage, Plane.class);
                     airSpaceService.updatePlane(plane);
-                    System.out.println("✅ Parsed: " + plane.getId());
+                    System.out.println("Parsed: " + plane.getId());
                 } catch (Exception e) {
-                    System.out.println("❌ Error parsing: " + e.getMessage());
+                    System.out.println("Error parsing: " + e.getMessage());
                 }
             }
         } catch (Exception e) {

@@ -42,10 +42,10 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable()) // מכבים CSRF כי אנחנו משתמשים ב-JWT
                 .cors(cors -> cors.configurationSource(corsConfigurationSource())) // מאפשרים ל-React לגשת
                 .authorizeHttpRequests(auth -> auth
-                        // 1. נתיב ההתחברות פתוח לכולם (אחרת אי אפשר לעשות לוגין!)
+                        // 1. נתיב ההתחברות פתוח לכולם (אחרת אי אפשר לעשות לוגין...)
                         .requestMatchers("/api/auth/login").permitAll()
 
-                        // 2. 🌟 הגדרת הרשאות חכמות לפי הבקשה שלך 🌟
+                        // 2. הגדרת הרשאות חכמות לפי הבקשה שלך
 
                         // רק ADMIN יכול לרשום controllers חדשים:
                         .requestMatchers("/api/users/register").hasRole("ADMIN")

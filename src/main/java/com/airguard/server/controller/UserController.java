@@ -32,12 +32,12 @@ public class UserController {
                     .body(Map.of("message", "Error: ID Number already exists in the system."));
         }
 
-        // 2. יצירת המשתמש החדש (פקח)
+        // 2. יצירת המשתמש החדש (controller)
         User newController = new User();
         newController.setIdNumber(newUserRequest.getIdNumber());
         newController.setFullName(newUserRequest.getFullName());
 
-        // 3. הצפנת הסיסמה לפני השמירה בבסיס הנתונים (הכי חשוב!)
+        // 3. הצפנת הסיסמה לפני השמירה בבסיס הנתונים
         newController.setPassword(passwordEncoder.encode(newUserRequest.getPassword()));
 
         // 4. כופה את התפקיד להיות 'Controller' (גם אם האקר ניסה לשלוח 'Admin' בבקשה)
@@ -46,7 +46,7 @@ public class UserController {
         // 5. שמירה ב-DB
         userRepository.save(newController);
 
-        System.out.println("✅ New Controller Registered: " + newController.getFullName() + " | ID: " + newController.getIdNumber());
+        System.out.println("New Controller Registered: " + newController.getFullName() + " | ID: " + newController.getIdNumber());
 
         return ResponseEntity.ok(Map.of("message", "Controller registered successfully!"));
     }

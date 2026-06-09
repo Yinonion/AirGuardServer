@@ -89,7 +89,7 @@ public class AesEncryptionService {
         return new String(Arrays.copyOfRange(decrypted, 8, decrypted.length), StandardCharsets.UTF_8);
     }
 
-    // ================= Helper Methods =================
+    // פונקציות עזר
 
     private byte[] longToBytes(long value) {
         return ByteBuffer.allocate(8).putLong(value).array();

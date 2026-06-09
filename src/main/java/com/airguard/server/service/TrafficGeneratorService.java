@@ -10,7 +10,7 @@ public class TrafficGeneratorService {
 
     private final AirSpaceService airSpaceService;
 
-    // הנה ההכנה לכפתור שביקשת! אם זה יהיה false, המערכת תפסיק לייצר מטוסים.
+    //אם זה יהיה false, המערכת תפסיק לייצר מטוסים
     private boolean isAutoSpawnEnabled = true;
 
     @Autowired
@@ -49,7 +49,7 @@ public class TrafficGeneratorService {
         plane.setHeading(Math.random() * 360);
         plane.setTargetHeading((angle + 180) % 360);
 
-        // --- חישוב הגובה המקסימלי (Glide Slope) ביחס למרחק ---
+        // חישוב הגובה המקסימלי (Glide Slope) ביחס למרחק
         // משתמשים ברדיוס כבסיס לחישוב הגובה המקסימלי ההגיוני לאותו מרחק
         double maxAllowedAltitude = radius * 40000;
         double minAltitude = 3000; // לא נייצר מטוסים נמוך מ-3000 רגל כדי שיהיה להם זמן גישה

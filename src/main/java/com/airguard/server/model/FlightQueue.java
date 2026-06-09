@@ -6,7 +6,7 @@ import java.util.List;
 
 public class FlightQueue {
 
-    // הגדרת החוליה (Node) ברשימה הדו-כיוונית
+    // הגדרת החוליה (Node)
     private class Node {
         Plane plane;
         Node next;
@@ -27,7 +27,7 @@ public class FlightQueue {
         this.size = 0;
     }
 
-    // --- אלגוריתם ההכנסה החכמה לפי הדרישה שלך ---
+    // אלגוריתם ההכנסה החכמה
     public void insert(Plane newPlane) {
         Node newNode = new Node(newPlane);
         double newScore = newPlane.calculatePriorityScore();
@@ -61,7 +61,7 @@ public class FlightQueue {
         size++;
     }
 
-    // --- פונקציות עזר להכנסת החוליה למקום הנכון מבלי לשבור את השרשרת ---
+    // פונקציות עזר להכנסת החוליה למקום הנכון מבלי לשבור את השרשרת
 
     private void insertNodeBefore(Node current, Node newNode) {
         if (current == null) { // הגענו לסוף הרשימה
@@ -97,7 +97,7 @@ public class FlightQueue {
         }
     }
 
-    // --- שליפת המטוס עם העדיפות הכי גבוהה (עבור המגדל שינחית אותו) ---
+    // שליפת המטוס עם העדיפות הכי גבוהה (כדי שהמגדל ינחית אותו)
     public Plane pollHighestPriority() {
         if (head == null) return null;
         Plane plane = head.plane;
@@ -115,7 +115,7 @@ public class FlightQueue {
         return size;
     }
 
-    // פונקציה שממירה את התור לרשימה רגילה (לצורך שליחה ל-React בהמשך אם נרצה להציג את התור במסך)
+    // פונקציה שממירה את התור לרשימה רגילה (בשביל השליחה ל-React בהמשך אם נרצה להציג את התור במסך)
     public List<Plane> toList() {
         List<Plane> list = new ArrayList<>();
         Node current = head;

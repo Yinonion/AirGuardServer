@@ -52,7 +52,7 @@ public class JwtRequestFilter extends OncePerRequestFilter {
             // בודקים מול JwtUtil אם הטוקן באמת תקין ותואם
             if (jwtUtil.isTokenValid(jwt, userDetails.getUsername())) {
 
-                // אם הכל תקין, אנחנו אומרים ל-Spring "אפשר להכניס אותו, הוא משלנו"
+                // אם הכל תקין, אנחנו אומרים ל-Spring שאפשר להכניס אותו
                 UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                         userDetails, null, userDetails.getAuthorities());
                 authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));

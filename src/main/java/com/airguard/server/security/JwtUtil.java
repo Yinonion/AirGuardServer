@@ -14,7 +14,7 @@ import java.util.function.Function;
 public class JwtUtil {
 
     // מפתח סודי שרק השרת מכיר. איתו הוא "חותם" על הטוקנים כדי שאי אפשר יהיה לזייף אותם.
-    // במערכת אמיתית זה יושב בקובץ הגדרות מוסתר, פה נשים את זה ישירות לצורך הנוחות.
+    // במערכת אמיתית זה יושב בקובץ הגדרות מוסתר, פה נשים את זה בקוד ישירות לצורך הנוחות, כי המערכת רק ב
     private static final String SECRET_KEY = "AirGuardTopSecretKeyForJwtAuthenticationMustBeLongEnough";
 
     // תוקף הטוקן - נגדיר ל-10 שעות (אורך של משמרת פקח טיסה)

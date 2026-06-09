@@ -46,8 +46,8 @@ public class AirGuardController {
      * עם timestamp, בעזרת אותו מפתח AES.
      *
      * תהליך:
-     * 1. פענוח AES — כישלון = מקור לא מורשה → 403
-     * 2. בדיקת timestamp — ישן מ-2 שניות → 403 (replay attack)
+     * 1. פענוח AES - כישלון = מקור לא מורשה → 403
+     * 2. בדיקת timestamp - ישן מ-2 שניות -> 403 (replay attack)
      * 3. קריאת ה-Plane מה-JSON המפוענח
      * 4. הוספה למערכת
      */
@@ -68,14 +68,14 @@ public class AirGuardController {
 
             // 4. הוספה למערכת
             airSpaceService.addPlane(plane);
-            System.out.println("✅ Secure manual plane added: " + plane.getId());
+            System.out.println("Secure manual plane added: " + plane.getId());
             return ResponseEntity.ok(plane);
 
         } catch (SecurityException e) {
-            System.out.println("🚨 Security violation on /api/planes: " + e.getMessage());
+            System.out.println("Security violation on /api/planes: " + e.getMessage());
             return ResponseEntity.status(403).body("Security check failed: " + e.getMessage());
         } catch (Exception e) {
-            System.out.println("❌ Error processing plane request: " + e.getMessage());
+            System.out.println("Error processing plane request: " + e.getMessage());
             return ResponseEntity.badRequest().body("Invalid request format.");
         }
     }
@@ -85,10 +85,10 @@ public class AirGuardController {
     @DeleteMapping("/planes/{id}")
     public void deletePlane(@PathVariable String id) {
         airSpaceService.removePlane(id);
-        System.out.println("🗑️ Manual plane deleted: " + id);
+        System.out.println("Manual plane deleted: " + id);
     }
 
-    @PostMapping("/toggle-spawn") // או שתוסיף /api/ לפני אם ככה עשית בשאר הפונקציות
+    @PostMapping("/toggle-spawn") // /api/ לפני אם ככה עשית בשאר הפונקציות
     public boolean toggleAutoSpawn() {
         // בודק מה המצב הנוכחי, והופך אותו (אם דלוק מכבה, אם מכובה מדליק)
         boolean currentState = trafficGeneratorService.isAutoSpawnEnabled();
